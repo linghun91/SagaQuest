@@ -12,11 +12,15 @@
 - **奖励机制**：物品、经验、命令、经济、点数、复合奖励
 - **前置任务**：支持复杂的任务依赖关系和逻辑条件
 - **任务分类**：主线、支线、日常、特殊任务完整分类
+- **重复机制**：支持任务重复完成，可设置冷却时间和最大完成次数
+- **完成统计**：自动记录每个玩家的任务完成次数，支持基于完成次数的前置条件
 
 ### 🖥️ GUI系统
 - **智能分页**：支持大量任务的分页显示
 - **实时进度**：任务进度条、状态显示、交互提示
 - **多视图模式**：任务列表、进行中、已完成等视图
+- **重复性显示**：任务列表和详情页面显示任务是否可重复、完成次数等信息
+- **完成统计**：实时显示玩家对每个任务的完成次数和限制信息
 
 ### 🎮 游戏内编辑器
 - **可视化编辑**：游戏内创建、修改、验证任务
@@ -225,7 +229,10 @@ SagaQuests 采用模块化的统一条件系统，支持灵活的条件组合和
 #### 📋 任务条件 (Quest Conditions)
 | 条件类型 | 用途 | 主要参数 |
 |---------|------|----------|
-| `PRE_QUEST` | 前置任务检查 | `quest_id`, `completed` |
+| `PRE_QUEST` | 前置任务检查 | `quest_id`, `completed`, `min_completions` |
+| `QUEST_HISTORY` | 任务历史完成次数检查 | `quest_id`/`quest_ids`, `compare`, `count`, `time_range` |
+| `TASK_REPEATABILITY` | 任务重复性检查 | `quest_id`, `require_repeatable`, `check_cooldown`, `check_max_completions` |
+| `TIME_RESET` | 时间重置条件检查 | `quest_id`, `periods`, `timezone` |
 
 ### 🎯 条件语法详解
 
@@ -481,6 +488,98 @@ master_challenge:
             time_check:
               type: TIME
               min_time: 18000  # 夜晚
+```
+
+## 🔄 任务重复性机制详解
+
+SagaQuests 支持完整的任务重复性机制，包括重复控制、完成统计和GUI显示。
+
+### 📊 重复性配置
+
+#### 基础重复性设置
+```yaml
+quest_example:
+  repeatable: true           # 是否可重复
+  max_completions: 10        # 最大完成次数，-1为无限制
+  cooldown: 300             # 重复冷却时间(秒)
+  
+  start_conditions:
+    # 任务重复性条件检查（可选，系统会自动检查）
+    repeatability:
+      type: TASK_REPEATABILITY
+      require_repeatable: true
+      check_cooldown: true
+      check_max_completions: true
+```
+
+#### 前置任务完成次数要求
+```yaml
+advanced_quest:
+  start_conditions:
+    pre_quest:
+      type: PRE_QUEST
+      quest_id: beginner_quest
+      min_completions: 3      # 要求前置任务完成3次以上
+    
+    # 或使用历史条件检查
+    quest_history:
+      type: QUEST_HISTORY
+      quest_id: beginner_quest
+      compare: ">="
+      count: 3
+```
+
+### 🖥️ GUI显示功能
+
+#### 任务列表显示
+玩家在 `/quests gui` 中查看任务时，每个任务会显示：
+
+- **重复性标识**：
+  - `▸ 可重复任务` - 绿色显示，任务可重复完成
+  - `▸ 单次任务` - 金色显示，任务只能完成一次
+
+- **完成次数统计**：
+  - `▸ 完成次数: 5/10次` - 显示当前完成次数/最大次数
+  - `▸ 完成次数: 8次` - 无限制任务的完成次数
+  - `▸ 尚未完成` - 从未完成的任务
+
+- **冷却信息**：
+  - `▸ 冷却中: 2分30秒` - 显示剩余冷却时间
+  - `重复冷却: 5分钟` - 显示重复冷却设置
+
+#### 任务详情显示
+在任务详情页面中，会显示相同的重复性信息，确保界面一致性。
+
+### 🎯 实际应用示例
+
+#### 可重复日常任务
+```yaml
+daily_mining:
+  display_name: "&e[日常] 采矿任务"
+  type: DAILY
+  repeatable: true
+  max_completions: 5
+  cooldown: 86400  # 24小时
+  
+  start_conditions:
+    level:
+      type: LEVEL
+      min_level: 10
+```
+
+#### 基于完成次数的进阶任务
+```yaml
+expert_challenge:
+  display_name: "&c[专家] 挑战任务"
+  repeatable: false
+  
+  start_conditions:
+    # 要求日常采矿完成10次以上
+    mining_experience:
+      type: QUEST_HISTORY
+      quest_id: daily_mining
+      compare: ">="
+      count: 10
 ```
 
 ### ⚠️ 常见语法错误与修复
